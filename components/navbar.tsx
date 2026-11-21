@@ -21,29 +21,8 @@ export function Navbar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
 
-    // Global notification listener for new messages
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'sharksite_messages' && e.newValue) {
-        try {
-          const newMsgs = JSON.parse(e.newValue);
-          const oldMsgs = e.oldValue ? JSON.parse(e.oldValue) : [];
-          if (newMsgs.length > oldMsgs.length) {
-            const latestMsg = newMsgs[0];
-            const notificationsEnabled = localStorage.getItem('sharksite_notifications_enabled') === 'true';
-            if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-              new Notification('New Message Received', {
-                body: `From: ${latestMsg.name}\n${latestMsg.subject || 'No Subject'}`,
-                icon: '/favicon.ico',
-                tag: 'new-message'
-              });
-            }
-          }
-        } catch (err) {}
-      }
-    };
-
     const handleNewMessage = (e: Event) => {
-      const customEvent = e as CustomEvent<any>;
+      const customEvent = e as CustomEvent<{ name: string; subject?: string }>;
       const notificationsEnabled = localStorage.getItem('sharksite_notifications_enabled') === 'true';
       if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
         new Notification('New Message Received', {
@@ -54,33 +33,9 @@ export function Navbar() {
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('sharksite_new_message', handleNewMessage);
-    
-    // Also check on load if there are unread messages that haven't been notified
-    setTimeout(() => {
-      const notificationsEnabled = localStorage.getItem('sharksite_notifications_enabled') === 'true';
-      if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-        const stored = localStorage.getItem('sharksite_messages');
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            const unread = parsed.filter((m: any) => !m.read);
-            if (unread.length > 0 && !sessionStorage.getItem('notified_unread_global')) {
-              new Notification('Unread Messages', {
-                body: `You have ${unread.length} unread message(s) waiting.`,
-                icon: '/favicon.ico',
-                tag: 'unread-messages'
-              });
-              sessionStorage.setItem('notified_unread_global', 'true');
-            }
-          } catch (e) {}
-        }
-      }
-    }, 1000);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('sharksite_new_message', handleNewMessage);
     };
   }, []);
@@ -89,11 +44,15 @@ export function Navbar() {
     setTimeout(() => {
       setIsNavigating(false);
     }, 0);
-    
-    // Track page views
-    import('@/lib/analytics').then(({ incrementPageViews }) => {
-      incrementPageViews();
-    });
+
+    // Track page views in Firestore once per session to conserve daily quota
+    const sessionKey = `sharksite_viewed_${pathname}`;
+    if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionKey)) {
+      sessionStorage.setItem(sessionKey, '1');
+      import('@/lib/analytics').then(({ incrementPageViews }) => {
+        incrementPageViews();
+      });
+    }
   }, [pathname]);
 
   useEffect(() => {

@@ -8,76 +8,7 @@ import Link from 'next/link';
 import { Calendar, Clock, ArrowRight, User } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 import { useState, useEffect } from 'react';
-import { getBlogPosts, BlogPost } from '@/lib/blog';
-
-const defaultArticles = [
-  {
-    id: 'future-of-web-design-2026',
-    slug: 'future-of-web-design-2026',
-    titleEn: "The Future of Web Design in 2026",
-    titleAr: "مستقبل تصميم الويب في عام 2026",
-    contentEn: "Explore the emerging trends that are reshaping the digital landscape, from AI-driven interfaces to immersive 3D experiences.",
-    contentAr: "استكشف الاتجاهات الناشئة التي تعيد تشكيل المشهد الرقمي، من الواجهات التي تعمل بالذكاء الاصطناعي إلى التجارب ثلاثية الأبعاد الغامرة.",
-    categoryEn: "Design Trends",
-    categoryAr: "اتجاهات التصميم",
-    dateEn: "March 15, 2026",
-    dateAr: "15 مارس 2026",
-    readTimeEn: "5",
-    readTimeAr: "5",
-    image: "https://images.unsplash.com/photo-1547658719-da2b51169166?q=80&w=800&auto=format&fit=crop",
-    author: {
-      nameEn: "Muneeb Adil",
-      nameAr: "منيب عادل",
-      roleEn: "Founder & Lead Designer",
-      roleAr: "المؤسس وكبير المصممين"
-    },
-    createdAt: Date.now()
-  },
-  {
-    id: 'mastering-nextjs-performance',
-    slug: 'mastering-nextjs-performance',
-    titleEn: "Mastering Next.js Performance",
-    titleAr: "احتراف أداء Next.js",
-    contentEn: "A deep dive into optimizing Next.js applications for lightning-fast load times and superior Core Web Vitals.",
-    contentAr: "غوص عميق في تحسين تطبيقات Next.js للحصول على أوقات تحميل فائقة السرعة ومؤشرات أداء الويب الأساسية المتفوقة.",
-    categoryEn: "Development",
-    categoryAr: "تطوير",
-    dateEn: "March 10, 2026",
-    dateAr: "10 مارس 2026",
-    readTimeEn: "8",
-    readTimeAr: "8",
-    image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=800&auto=format&fit=crop",
-    author: {
-      nameEn: "Muneeb Adil",
-      nameAr: "منيب عادل",
-      roleEn: "Senior Developer",
-      roleAr: "مطور أول"
-    },
-    createdAt: Date.now() - 100000
-  },
-  {
-    id: 'ui-ux-psychology',
-    slug: 'ui-ux-psychology',
-    titleEn: "The Psychology of UI/UX",
-    titleAr: "سيكولوجية واجهة وتجربة المستخدم",
-    contentEn: "Understanding how cognitive biases and human behavior influence user interaction and conversion rates.",
-    contentAr: "فهم كيف تؤثر التحيزات المعرفية والسلوك البشري على تفاعل المستخدم ومعدلات التحويل.",
-    categoryEn: "UX Design",
-    categoryAr: "تصميم تجربة المستخدم",
-    dateEn: "March 5, 2026",
-    dateAr: "5 مارس 2026",
-    readTimeEn: "6",
-    readTimeAr: "6",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=800&auto=format&fit=crop",
-    author: {
-      nameEn: "Muneeb Adil",
-      nameAr: "منيب عادل",
-      roleEn: "UX Researcher",
-      roleAr: "باحث تجربة المستخدم"
-    },
-    createdAt: Date.now() - 200000
-  }
-];
+import { subscribeToBlogPosts, defaultBlogPosts, BlogPost } from '@/lib/blog';
 
 export default function BlogPage() {
   const { t, language } = useLanguage();
@@ -85,16 +16,18 @@ export default function BlogPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function loadPosts() {
-      const posts = await getBlogPosts();
-      if (posts && posts.length > 0) {
-        setArticles(posts);
-      } else {
-        setArticles(defaultArticles);
+    const unsubscribe = subscribeToBlogPosts(
+      (posts) => {
+        setArticles(posts.length > 0 ? posts : defaultBlogPosts);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Blog posts subscription error:', error);
+        setArticles(defaultBlogPosts);
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    }
-    loadPosts();
+    );
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -136,7 +69,7 @@ export default function BlogPage() {
                   key={article.id}
                   className="group flex flex-col bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300"
                 >
-                  <Link href={`/blog/${article.slug}`} className="block relative aspect-[16/10] overflow-hidden">
+                  <Link href={`/blog/post?slug=${encodeURIComponent(article.slug)}`} className="block relative aspect-[16/10] overflow-hidden">
                     <Image 
                       src={article.image} 
                       alt={language === 'ar' ? article.titleAr : article.titleEn} 
@@ -161,7 +94,7 @@ export default function BlogPage() {
                     </div>
                     
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-3 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors line-clamp-2">
-                      <Link href={`/blog/${article.slug}`}>
+                      <Link href={`/blog/post?slug=${encodeURIComponent(article.slug)}`}>
                         {language === 'ar' ? article.titleAr : article.titleEn}
                       </Link>
                     </h2>
@@ -175,7 +108,7 @@ export default function BlogPage() {
                         </div>
                         <span className="text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors duration-300">{language === 'ar' ? article.author.nameAr : article.author.nameEn}</span>
                       </div>
-                      <Link href={`/blog/${article.slug}`} className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/30">
+                      <Link href={`/blog/post?slug=${encodeURIComponent(article.slug)}`} className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/30">
                         <ArrowRight className="w-5 h-5" />
                       </Link>
                     </div>

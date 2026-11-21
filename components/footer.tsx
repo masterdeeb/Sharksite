@@ -4,20 +4,18 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Facebook, Instagram, Twitter, Mail, Sparkles, Lock, Linkedin, Github, Youtube } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
-import { getSettings, SiteSettings } from '@/lib/settings';
+import { subscribeToSettings, SiteSettings } from '@/lib/settings';
 
 export function Footer() {
   const { t, language } = useLanguage();
   const [settings, setSettings] = useState<SiteSettings | null>(null);
 
   useEffect(() => {
-    const loadSettings = async () => {
-      const s = await getSettings();
-      setSettings(s);
-    };
-    loadSettings();
-    window.addEventListener('settingsUpdated', loadSettings);
-    return () => window.removeEventListener('settingsUpdated', loadSettings);
+    const unsubscribe = subscribeToSettings(
+      (s) => setSettings(s),
+      (error) => console.error('Footer settings error:', error)
+    );
+    return () => unsubscribe();
   }, []);
 
   const footerNavItems = [

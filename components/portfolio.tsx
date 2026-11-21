@@ -3,21 +3,30 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n';
-import { Project, getProjects } from '@/lib/projects';
+import { Project, initialProjects, subscribeToProjects } from '@/lib/projects';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 
 export function Portfolio() {
   const { language } = useLanguage();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    const loadProjects = async () => {
-      const allProjects = await getProjects();
-      const homeProjects = allProjects.filter(p => p.showOnHome);
-      setProjects(homeProjects);
-    };
-    loadProjects();
+    const unsubscribe = subscribeToProjects(
+      (allProjects) => {
+        if (allProjects.length === 0) {
+          setProjects(initialProjects);
+        } else {
+          const homeProjects = allProjects.filter((p) => p.showOnHome);
+          setProjects(homeProjects.length > 0 ? homeProjects : allProjects.slice(0, 6));
+        }
+      },
+      (error) => {
+        console.error('Portfolio subscription error:', error);
+        setProjects(initialProjects);
+      }
+    );
+    return () => unsubscribe();
   }, []);
 
   const [itemsToShow, setItemsToShow] = useState(3);

@@ -20,7 +20,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: 'standalone', // Change to 'export' for static hosting
+  output: 'export', // Static export for Netlify hosting
+  trailingSlash: true,
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     // Do not modify - file watching is disabled to prevent flickering during agent edits.

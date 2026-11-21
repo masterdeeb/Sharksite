@@ -8,25 +8,33 @@ import { ArrowUpRight, X, ExternalLink, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'motion/react';
-import { Project, initialProjects, defaultCategories, getProjects, getCategories } from '@/lib/projects';
+import { Project, initialProjects, defaultCategories, subscribeToProjects, subscribeToCategories } from '@/lib/projects';
 
 export default function WorksPage() {
   const { t, language } = useLanguage();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [categories, setCategories] = useState<string[]>(defaultCategories);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   useEffect(() => {
-    const loadData = async () => {
-      const projs = await getProjects();
-      setProjects(projs);
-      
-      const cats = await getCategories();
-      setCategories(cats);
+    const unsubProjects = subscribeToProjects(
+      (projs) => {
+        setProjects(projs.length > 0 ? projs : initialProjects);
+      },
+      (error) => console.error('Works projects subscription error:', error)
+    );
+    const unsubCategories = subscribeToCategories(
+      (cats) => {
+        setCategories(cats.length > 0 ? cats.map((c) => c.name) : defaultCategories);
+      },
+      (error) => console.error('Works categories subscription error:', error)
+    );
+    return () => {
+      unsubProjects();
+      unsubCategories();
     };
-    loadData();
   }, []);
 
   const displayCategories = ['All', ...categories];

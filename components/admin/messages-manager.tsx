@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { Trash2, Mail, Clock, User, MessageSquare, Bell, BellOff } from 'lucide-react'
-import { Message, getMessages, updateMessageInSupabase, deleteMessageFromSupabase } from '@/lib/messages'
+import {
+  Message,
+  subscribeToMessages,
+  updateMessageRead,
+  deleteMessageFromFirestore,
+} from '@/lib/messages'
+import { useLocalAuth } from '@/lib/local-auth'
 
 export function MessagesManager() {
+  const { authReady, isAdmin } = useLocalAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [now, setNow] = useState(0)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
@@ -37,62 +44,59 @@ export function MessagesManager() {
   }
 
   useEffect(() => {
-    const updateNow = () => setNow(Date.now());
-    updateNow();
-    const timer = setInterval(updateNow, 60000);
-    return () => clearInterval(timer);
-  }, []);
+    const updateNow = () => setNow(Date.now())
+    updateNow()
+    const timer = setInterval(updateNow, 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
-    const loadData = async () => {
-      const msgs = await getMessages()
-      setMessages(msgs)
-      
-      const hasUnread = msgs.some(m => !m.read)
-      if (hasUnread) {
-        const marked = msgs.map(m => ({ ...m, read: true }))
-        setMessages(marked)
-        localStorage.setItem('sharksite_messages', JSON.stringify(marked))
-        
-        // Update unread in Supabase
-        const unreadMsgs = msgs.filter(m => !m.read)
-        for (const msg of unreadMsgs) {
-          await updateMessageInSupabase(msg.id, { read: true })
+    if (!authReady || !isAdmin) return
+
+    const unsubscribe = subscribeToMessages(
+      async (msgs) => {
+        setMessages(msgs)
+        const unreadMsgs = msgs.filter((m) => !m.read)
+        if (unreadMsgs.length > 0) {
+          for (const msg of unreadMsgs) {
+            try {
+              await updateMessageRead(msg.id, true)
+            } catch (e) {
+              console.error('Error marking message read:', e)
+            }
+          }
         }
-        
-        window.dispatchEvent(new Event('sharksite_messages_read'))
-      }
-    }
-    loadData()
-  }, [])
+      },
+      (error) => console.error('Messages subscription error:', error)
+    )
+
+    return () => unsubscribe()
+  }, [authReady, isAdmin])
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this message?')) {
-      const newMessages = messages.filter(m => m.id !== id)
-      setMessages(newMessages)
-      localStorage.setItem('sharksite_messages', JSON.stringify(newMessages))
-      await deleteMessageFromSupabase(id)
+      await deleteMessageFromFirestore(id)
     }
   }
 
   const formatTimeAgo = (timestamp: number) => {
     if (now === 0) return ''
     const seconds = Math.max(0, Math.floor((now - timestamp) / 1000))
-    
+
     if (seconds < 60) {
       return `${seconds} seconds ago`
     }
-    
+
     const minutes = Math.floor(seconds / 60)
     if (minutes < 60) {
       return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
     }
-    
+
     const hours = Math.floor(minutes / 60)
     if (hours < 24) {
       return `${hours} hour${hours > 1 ? 's' : ''} ago`
     }
-    
+
     const days = Math.floor(hours / 24)
     return `${days} day${days > 1 ? 's' : ''} ago`
   }
@@ -103,7 +107,7 @@ export function MessagesManager() {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
   }
 
@@ -117,12 +121,12 @@ export function MessagesManager() {
             {messages.length}
           </span>
         </h2>
-        
+
         <button
           onClick={toggleNotifications}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-            notificationsEnabled 
-              ? 'bg-purple-100 text-purple-600 hover:bg-purple-200' 
+            notificationsEnabled
+              ? 'bg-purple-100 text-purple-600 hover:bg-purple-200'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
@@ -139,7 +143,7 @@ export function MessagesManager() {
           )}
         </button>
       </div>
-      
+
       <div className="divide-y divide-slate-100">
         {messages.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
@@ -159,7 +163,10 @@ export function MessagesManager() {
                         <User className="w-4 h-4 text-slate-400" />
                         {msg.name}
                       </h3>
-                      <a href={`mailto:${msg.email}`} className="text-sm text-purple-600 hover:underline flex items-center gap-2 mt-1">
+                      <a
+                        href={`mailto:${msg.email}`}
+                        className="text-sm text-purple-600 hover:underline flex items-center gap-2 mt-1"
+                      >
                         <Mail className="w-3.5 h-3.5" />
                         {msg.email}
                       </a>
@@ -174,7 +181,7 @@ export function MessagesManager() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                     {msg.subject && (
                       <div className="text-sm font-bold text-slate-900 mb-2 pb-2 border-b border-slate-100">
@@ -187,9 +194,9 @@ export function MessagesManager() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start justify-end opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
+                  <button
                     onClick={() => handleDelete(msg.id)}
                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2"
                     title="Delete Message"

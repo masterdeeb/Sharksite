@@ -6,7 +6,7 @@ import { Footer } from '@/components/footer';
 import { Mail, MapPin, Phone, Send, MessageSquare } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 import { saveMessage } from '@/lib/messages';
-import { getSettings, SiteSettings } from '@/lib/settings';
+import { subscribeToSettings, SiteSettings } from '@/lib/settings';
 
 export default function ContactPage() {
   const { t, language } = useLanguage();
@@ -16,13 +16,11 @@ export default function ContactPage() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
 
   useEffect(() => {
-    const loadSettings = async () => {
-      const s = await getSettings();
-      setSettings(s);
-    };
-    loadSettings();
-    window.addEventListener('settingsUpdated', loadSettings);
-    return () => window.removeEventListener('settingsUpdated', loadSettings);
+    const unsubscribe = subscribeToSettings(
+      (s) => setSettings(s),
+      (error) => console.error('Contact settings subscription error:', error)
+    );
+    return () => unsubscribe();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
